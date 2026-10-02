@@ -1,0 +1,50 @@
+name: Ginseng Strip GTA - PSP Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    container:
+      image: pspdev/pspdev:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify PSP toolchain
+        run: |
+          psp-gcc --version
+          psp-config --pspsdk-path
+          pack-pbp --help
+
+      - name: Check project files
+        run: |
+          test -f Makefile
+          test -f src/main.c
+          test -f build-psp.sh
+
+      - name: Build PSP game
+        run: |
+          chmod +x build-psp.sh
+          ./build-psp.sh
+
+      - name: Check EBOOT.PBP
+        run: |
+          test -s dist/EBOOT.PBP
+          test "$(wc -c < dist/EBOOT.PBP)" -ge 65536
+          echo "PSP EBOOT.PBP successfully created."
+
+      - name: Upload PSP game
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ginseng-Strip-GTA-PSP
+          path: dist/EBOOT.PBP
+          if-no-files-found: error
