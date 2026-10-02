@@ -25,51 +25,120 @@ jobs:
         shell: bash
         run: |
           set -e
+
           echo "=== PSPDEV TOOLCHAIN ==="
           psp-gcc --version
+
           echo "=== PSPSDK ==="
           psp-config --pspsdk-path
+
           echo "=== pack-pbp ==="
           command -v pack-pbp
+
           echo "=== mksfoex ==="
           command -v mksfoex
+
           echo "PSP toolchain check OK."
 
       - name: Verify game project
         shell: bash
         run: |
           set -e
+
           echo "Checking project files..."
-          test -f Makefile
-          test -f src/main.c
-          test -f build-psp.sh
-          test -d include
-          test -d assets
-          test -d data
-          echo "Project structure OK."
+
+          echo "Checking Makefile..."
+          if [ ! -f Makefile ]; then
+            echo "ERROR: Makefile is missing!"
+            exit 1
+          fi
+
+          echo "Checking src/main.c..."
+          if [ ! -f src/main.c ]; then
+            echo "ERROR: src/main.c is missing!"
+            exit 1
+          fi
+
+          echo "Checking build-psp.sh..."
+          if [ ! -f build-psp.sh ]; then
+            echo "ERROR: build-psp.sh is missing!"
+            exit 1
+          fi
+
+          echo "Checking include/..."
+          if [ ! -d include ]; then
+            echo "ERROR: include/ directory is missing!"
+            exit 1
+          fi
+
+          echo "Checking assets/..."
+          if [ ! -d assets ]; then
+            echo "ERROR: assets/ directory is missing!"
+            exit 1
+          fi
+
+          echo "Checking data/..."
+          if [ ! -d data ]; then
+            echo "ERROR: data/ directory is missing!"
+            exit 1
+          fi
+
+          echo "================================"
+          echo "PROJECT STRUCTURE OK"
+          echo "================================"
 
       - name: Build PSP game
         shell: bash
         run: |
           set -e
+
           chmod +x build-psp.sh
+
           echo "=== BUILDING GINSENG STRIP GTA ==="
+
           ./build-psp.sh
 
       - name: Validate EBOOT.PBP
         shell: bash
         run: |
           set -e
+
           echo "Checking EBOOT.PBP..."
-          test -f dist/EBOOT.PBP
-          test -s dist/EBOOT.PBP
-          SIZE=$(wc -c < dist/EBOOT.PBP)
-          echo "EBOOT.PBP size: ${SIZE} bytes"
-          if [ "$SIZE" -lt 65536 ]; then
-            echo "::error::EBOOT.PBP is unexpectedly small."
+
+          if [ ! -f dist/EBOOT.PBP ]; then
+            echo "ERROR: dist/EBOOT.PBP was not created!"
             exit 1
           fi
+
+          if [ ! -s dist/EBOOT.PBP ]; then
+            echo "ERROR: EBOOT.PBP is empty!"
+            exit 1
+          fi
+
+          SIZE=$(wc -c < dist/EBOOT.PBP)
+
+          echo "EBOOT.PBP size: ${SIZE} bytes"
+
+          if [ "$SIZE" -lt 65536 ]; then
+            echo "ERROR: EBOOT.PBP is unexpectedly small!"
+            exit 1
+          fi
+
           echo "EBOOT.PBP file check OK."
+
+          if command -v unpack-pbp >/dev/null 2>&1; then
+            echo "Checking PBP structure..."
+
+            rm -rf /tmp/pbp-check
+            mkdir -p /tmp/pbp-check
+
+            unpack-pbp dist/EBOOT.PBP /tmp/pbp-check/out
+
+            echo "PBP structure check OK."
+          else
+            echo "unpack-pbp is not available."
+            echo "Skipping structural PBP check."
+          fi
 
       - name: Show build result
         shell: bash
@@ -77,6 +146,7 @@ jobs:
           echo "======================================"
           echo "GINSENG STRIP GTA PSP BUILD COMPLETE"
           echo "======================================"
+
           ls -lh dist/EBOOT.PBP
 
       - name: Upload PSP game
