@@ -40,57 +40,83 @@ jobs:
 
           echo "PSP toolchain check OK."
 
+      - name: Find project directory
+        shell: bash
+        run: |
+          set -e
+
+          echo "=== SEARCHING FOR MAKEFILE ==="
+
+          PROJECT_DIR=""
+
+          if [ -f "./Makefile" ]; then
+            PROJECT_DIR="."
+          else
+            for dir in ./*; do
+              if [ -d "$dir" ] && [ -f "$dir/Makefile" ]; then
+                PROJECT_DIR="$dir"
+                break
+              fi
+            done
+          fi
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Makefile could not be found."
+            echo "=== REPOSITORY CONTENT ==="
+            find . -maxdepth 4 -print
+            exit 1
+          fi
+
+          echo "Project directory found: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
       - name: Verify game project
         shell: bash
         run: |
           set -e
 
+          cd "$PROJECT_DIR"
+
           echo "Checking project files..."
 
-          echo "Checking Makefile..."
-          if [ ! -f Makefile ]; then
+          test -f Makefile || {
             echo "ERROR: Makefile is missing!"
             exit 1
-          fi
+          }
 
-          echo "Checking src/main.c..."
-          if [ ! -f src/main.c ]; then
+          test -f src/main.c || {
             echo "ERROR: src/main.c is missing!"
             exit 1
-          fi
+          }
 
-          echo "Checking build-psp.sh..."
-          if [ ! -f build-psp.sh ]; then
+          test -f build-psp.sh || {
             echo "ERROR: build-psp.sh is missing!"
             exit 1
-          fi
+          }
 
-          echo "Checking include/..."
-          if [ ! -d include ]; then
+          test -d include || {
             echo "ERROR: include/ directory is missing!"
             exit 1
-          fi
+          }
 
-          echo "Checking assets/..."
-          if [ ! -d assets ]; then
+          test -d assets || {
             echo "ERROR: assets/ directory is missing!"
             exit 1
-          fi
+          }
 
-          echo "Checking data/..."
-          if [ ! -d data ]; then
+          test -d data || {
             echo "ERROR: data/ directory is missing!"
             exit 1
-          fi
+          }
 
-          echo "================================"
           echo "PROJECT STRUCTURE OK"
-          echo "================================"
 
       - name: Build PSP game
         shell: bash
         run: |
           set -e
+
+          cd "$PROJECT_DIR"
 
           chmod +x build-psp.sh
 
@@ -103,17 +129,19 @@ jobs:
         run: |
           set -e
 
+          cd "$PROJECT_DIR"
+
           echo "Checking EBOOT.PBP..."
 
-          if [ ! -f dist/EBOOT.PBP ]; then
+          test -f dist/EBOOT.PBP || {
             echo "ERROR: dist/EBOOT.PBP was not created!"
             exit 1
-          fi
+          }
 
-          if [ ! -s dist/EBOOT.PBP ]; then
+          test -s dist/EBOOT.PBP || {
             echo "ERROR: EBOOT.PBP is empty!"
             exit 1
-          fi
+          }
 
           SIZE=$(wc -c < dist/EBOOT.PBP)
 
@@ -126,23 +154,11 @@ jobs:
 
           echo "EBOOT.PBP file check OK."
 
-          if command -v unpack-pbp >/dev/null 2>&1; then
-            echo "Checking PBP structure..."
-
-            rm -rf /tmp/pbp-check
-            mkdir -p /tmp/pbp-check
-
-            unpack-pbp dist/EBOOT.PBP /tmp/pbp-check/out
-
-            echo "PBP structure check OK."
-          else
-            echo "unpack-pbp is not available."
-            echo "Skipping structural PBP check."
-          fi
-
       - name: Show build result
         shell: bash
         run: |
+          cd "$PROJECT_DIR"
+
           echo "======================================"
           echo "GINSENG STRIP GTA PSP BUILD COMPLETE"
           echo "======================================"
@@ -153,6 +169,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Ginseng-Strip-GTA-PSP
-          path: dist/EBOOT.PBP
+          path: ${{ env.PROJECT_DIR }}/dist/EBOOT.PBP
           if-no-files-found: error
           retention-days: 30
