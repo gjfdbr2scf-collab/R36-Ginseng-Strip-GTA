@@ -1,0 +1,88 @@
+name: Ginseng Strip GTA - PSP Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Ginseng Strip GTA for PSP
+    runs-on: ubuntu-latest
+
+    container:
+      image: pspdev/pspdev:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify PSP toolchain
+        shell: bash
+        run: |
+          set -e
+          echo "=== PSPDEV TOOLCHAIN ==="
+          psp-gcc --version
+          echo "=== PSPSDK ==="
+          psp-config --pspsdk-path
+          echo "=== pack-pbp ==="
+          command -v pack-pbp
+          echo "=== mksfoex ==="
+          command -v mksfoex
+          echo "PSP toolchain check OK."
+
+      - name: Verify game project
+        shell: bash
+        run: |
+          set -e
+          echo "Checking project files..."
+          test -f Makefile
+          test -f src/main.c
+          test -f build-psp.sh
+          test -d include
+          test -d assets
+          test -d data
+          echo "Project structure OK."
+
+      - name: Build PSP game
+        shell: bash
+        run: |
+          set -e
+          chmod +x build-psp.sh
+          echo "=== BUILDING GINSENG STRIP GTA ==="
+          ./build-psp.sh
+
+      - name: Validate EBOOT.PBP
+        shell: bash
+        run: |
+          set -e
+          echo "Checking EBOOT.PBP..."
+          test -f dist/EBOOT.PBP
+          test -s dist/EBOOT.PBP
+          SIZE=$(wc -c < dist/EBOOT.PBP)
+          echo "EBOOT.PBP size: ${SIZE} bytes"
+          if [ "$SIZE" -lt 65536 ]; then
+            echo "::error::EBOOT.PBP is unexpectedly small."
+            exit 1
+          fi
+          echo "EBOOT.PBP file check OK."
+
+      - name: Show build result
+        shell: bash
+        run: |
+          echo "======================================"
+          echo "GINSENG STRIP GTA PSP BUILD COMPLETE"
+          echo "======================================"
+          ls -lh dist/EBOOT.PBP
+
+      - name: Upload PSP game
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ginseng-Strip-GTA-PSP
+          path: dist/EBOOT.PBP
+          if-no-files-found: error
+          retention-days: 30
